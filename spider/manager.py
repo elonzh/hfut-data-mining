@@ -1,10 +1,9 @@
 # -*- coding:utf-8 -*-
 from __future__ import unicode_literals
 
+from collections import Iterable
 from gevent.pool import Pool
 from gevent.queue import Queue
-
-from collections import Iterable
 
 from .log import logger
 

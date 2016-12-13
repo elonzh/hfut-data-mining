@@ -36,7 +36,8 @@ class HfutSystemSpider(scrapy.Spider):
     def __init__(self, account, password, campus, *args, **kwargs):
         super(HfutSystemSpider, self).__init__(*args, **kwargs)
         self.session = StudentSession(account, password, campus)
-        host_rank = sort_hosts()
+        ENV['REQUEST_ARGUMENTS_CHECK'] = False
+        host_rank = sort_hosts(ENV['XC_HOSTS'], path='teacher/asp/Jskb_table.asp')
         self.logger.info('选择最快的服务器: %s', host_rank)
         self.session.host = host_rank[0][1]
         self.session.login()
@@ -65,12 +66,6 @@ class HfutSystemSpider(scrapy.Spider):
             errback=errbcak
         )
 
-    def record_no_results_request(self, request):
-        key = request_fingerprint(request)
-        # 同时使用一个文件会产生写竞争
-        with open(os.path.join(self.no_results_request_records_file, key), 'wb') as fp:
-            fp.write(key)
-
     def start_requests(self):
         # http://scrapy.readthedocs.io/en/latest/topics/request-response.html#scrapy.http.Request
         interface = GetCode()
@@ -80,8 +75,6 @@ class HfutSystemSpider(scrapy.Spider):
         prev_interface = response.meta['interface']
         # @structure {'专业': [{'专业代码': str, '专业名称': str}], '学期': [{'学期代码': str, '学期名称': str}]}
         code = prev_interface.parse(MockResponse(response))
-        if not code:
-            self.record_no_results_request(response.request)
         # todo: using for profile
         code = {
             '专业': [
@@ -144,8 +137,6 @@ class HfutSystemSpider(scrapy.Spider):
         major_item = response.meta['major_item']
 
         courses = prev_interface.parse(MockResponse(response))
-        if not courses:
-            self.record_no_results_request(response.request)
         for course in courses:
             course_item = CourseItem(
                 code=course['课程代码'],
@@ -192,8 +183,6 @@ class HfutSystemSpider(scrapy.Spider):
 
         # @structure [{'任课教师': str, '课程名称': str, '教学班号': str, 'c': str, '班级容量': int}]
         teaching_classes = prev_interface.parse(MockResponse(response))
-        if not teaching_classes:
-            self.record_no_results_request(response.request)
         for base_class_info in teaching_classes:
             interface = GetClassInfo(xqdm=term_item['code'], kcdm=course_item['code'], jxbh=base_class_info['教学班号'])
             yield self.request_transform(
@@ -218,8 +207,6 @@ class HfutSystemSpider(scrapy.Spider):
         # @structure {'校区': str,'开课单位': str,'考核类型': str,'课程类型': str,'课程名称': str,'教学班号': str,
         # '起止周': str, '时间地点': str,'学分': float,'性别限制': str,'优选范围': str,'禁选范围': str,'选中人数': int,'备 注': str}
         class_info = prev_interface.parse(MockResponse(response))
-        if not class_info:
-            self.record_no_results_request(response.request)
         teaching_class_item = TeachingClassItem(
             term_code=term_item['code'],
             course_code=course_item['code'],
@@ -249,8 +236,7 @@ class HfutSystemSpider(scrapy.Spider):
                 'interface': interface,
                 'major_item': major_item,
                 'teaching_class_item': teaching_class_item
-            },
-            errbcak=lambda response: self.record_no_results_request(response.request)
+            }
         )
 
     def parse_student(self, response):

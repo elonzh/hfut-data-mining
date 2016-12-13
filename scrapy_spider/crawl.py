@@ -12,7 +12,7 @@ if os.path.exists(cache):
 settins = get_project_settings()
 
 settins = deepcopy(settins)
-settins.update_db(
+settins.update(
     {
         'CONCURRENT_REQUESTS': 1,
         'CONCURRENT_ITEMS': 300
